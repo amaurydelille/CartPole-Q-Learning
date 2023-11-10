@@ -2,12 +2,11 @@ import gym
 import numpy as np
 import matplotlib.pyplot as plt
 from IPython import display
+import imageio
 
 EPOCHS = 50000
 SOLVED = 195
-CONSECUTIVE_TIMESTEP = 10
-MAX_CART_RANGE = 2.4
-MAX_POLE_ANGLE = 15
+CONSECUTIVE_TIMESTEP = 100
 LEARNING_RATE = 0.1
 DISCOUNT_FACTOR = 0.95
 STATES = 4
@@ -49,17 +48,25 @@ class QLearning:
         plt.pause(0.001)  
         display.clear_output(wait=True)
         
+    def save_gif(self, frames, filename):
+        with imageio.get_writer(filename, mode='I', fps=30) as writer:
+            for frame in frames[-300:]:
+                writer.append_data(frame)
+
     def fit(self, epochs=EPOCHS, discount=DISCOUNT_FACTOR, learning_rate=LEARNING_RATE, timestep=CONSECUTIVE_TIMESTEP, epsilon=EPSILON):
-        rewards, steps = 0, 0
+        steps = 0
         for epoch in range(1, epochs+1):
             steps += 1
             state = self.discrete(self.env.reset())
             score = 0
             done = False
+            frames = []
 
             while not done:
                 if epoch % timestep == 0:
                     self.env.render()
+                    frame = self.env.render(mode='rgb_array')
+                    frames.append(frame)
                 if np.random.uniform(0, 1) < epsilon:
                     action = self.env.action_space.sample()
                 else:
@@ -68,7 +75,7 @@ class QLearning:
                 newstate = self.discrete(obs)
 
                 if done:
-                    reward = -150
+                    reward = -375
 
                 score += reward
                 maxfuture = np.max(self.table[newstate])
@@ -82,10 +89,10 @@ class QLearning:
             self.scores.append(score)
             self.update_plot(epoch) #using matplotlib
 
-            if score > SOLVED and steps >= CONSECUTIVE_TIMESTEP:
+            if score > SOLVED:
                 print("Problem solved")
+                self.save_gif(frames, "solved.gif")
 
 qlearn = QLearning()
 qlearn.initialize_QTable()
 qlearn.fit()
-
