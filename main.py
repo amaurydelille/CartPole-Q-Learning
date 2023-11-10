@@ -1,97 +1,76 @@
-import random
-import math
 import gym
 import numpy as np
 
-EPOCHS = 10000
-DISCOUNT = 0.7 
+EPOCHS = 50000
+SOLVED = 195
+CONSECUTIVE_TIMESTEP = 100
+MAX_CART_RANGE = 2.4
+MAX_POLE_ANGLE = 15
 LEARNING_RATE = 0.1
-RENDER = 100
-PROGRESS = 100
-PLUS = 50
-MINUS = -50
-epsilon = 1  
-START_EPSILON_DECAYING = 1
-END_EPSILON_DECAYING = EPOCHS // 2
-epsilon_decay_value = epsilon / (END_EPSILON_DECAYING - START_EPSILON_DECAYING)
+DISCOUNT_FACTOR = 0.3
+STATES = 4
+ACTIONS = 2
+BIN_SIZE = 20
+EPSILON = 0.4
 
 class QLearning:
     def __init__(self) -> None:
-        self.env = gym.make('CartPole-v1', new_step_api=True, render_mode="human")
-        self.QTable = []
-        self.bins = []
-        self.space = len(self.env.observation_space.high)
-    def random_init(self): 
-        states = self.env.observation_space.shape[0]
-        actions = self.env.action_space.n
+        self.env = gym.make("CartPole-v1", render_mode="human")
+        self.table = [] 
+        self.bins = [] 
 
-        episodes = 10
-        for i in range(1, episodes+1):
-            state = self.env.reset()
-            done = False
-            score = 0
+    def initialize_QTable(self, bin_size = BIN_SIZE):
+        self.bins = [np.linspace(-4.8,4.8,bin_size),
+            np.linspace(-4, 4, bin_size),
+            np.linspace(-0.418, 0.418, bin_size),
+            np.linspace(-4, 4, bin_size)]
+
+        self.table = np.random.uniform(low=-1, high=1, size=([BIN_SIZE] * STATES + [ACTIONS]))
+
+    def discrete(self, state):
+        index = []
+        for i in range(len(state)):
+            index.append(np.digitize(state[i], self.bins[i]) - 1)
+        return tuple(index)
+        
+    def fit(self, epochs=EPOCHS, discount=DISCOUNT_FACTOR, learning_rate=LEARNING_RATE, timestep=CONSECUTIVE_TIMESTEP, epsilon=EPSILON):
+        rewards, steps = 0, 0
+        score, done = 0, False
+
+        for epoch in range(1, epochs+1):
+
+            steps += 1
+            state = self.discrete(self.env.reset())
 
             while not done:
-                action = random.randint(0, 1)
-                n_step, reward, done, info = self.env.step(action)
+                if epoch % timestep == 0:
+                    self.env.render()
+                if np.random.uniform(0, 1) < epsilon:
+                    action = self.env.action_space.sample()
+                else:
+                    action = np.argmax(self.table[state])
+                obs, reward, done, _ = self.env.step(action)
+                newstate = self.discrete(obs)
                 score += reward
-                self.env.render()
 
-            print(f"Episode : {i} - Score : {score}")
+                if not done:
+                    maxfuture = np.max(self.table[newstate])
+                    q = self.table[state + (action, )]
+                    newq = (1 - learning_rate) * q + learning_rate * (reward + discount * maxfuture)
+                    self.table[state + (action, )] = newq
+                    state = newstate
 
-        self.env.close()
+                else:
+                    rewards += score
+                    if score > SOLVED and steps >= CONSECUTIVE_TIMESTEP:
+                        print("Problem solved")
+                        break
+                    
+            if epoch % timestep == 0:
+                print(reward/timestep)
 
-    def initialize_QTable(self):
-        self.bins = [] 
-        self.bins.append([4 * (-4.8 + i * 4.8) for i in range(21)]) #cart position
-        self.bins.append([4 * (-4 + i * 4) for i in range(21)]) #cart velocity
-        self.bins.append([4 * (-0.418 + i * 0.418) for i in range(21)]) #pole angle
-        self.bins.append([4 * (-4 + i * 4) for i in range(21)]) #pole angular velocity
 
-        self.QTable = np.random.uniform(-2, 0, [len(self.bins[0])] * self.space + [self.env.action_space.n])
-        self.QTable.shape
-
-    def state_to_discrete(self, state, bins, space):
-        state_i = []
-        for i in range(self.space):
-            state_i.append(np.digitize(state[i], self.bins[i]) - 1)
-        return tuple(state_i)
-        
-
-        
 qlearn = QLearning()
 qlearn.initialize_QTable()
-scores = []
-renderer = {"epoch": [], "average": [], "min": [], "max": []}
+qlearn.fit()
 
-for epoch in range(EPOCHS):
-    discrete = qlearn.state_to_discrete(qlearn.env.reset(), qlearn.bins, qlearn.space)
-
-    done = False
-    count = 0
-
-    while not done:
-        if epoch % PROGRESS == 0:
-            qlearn.env.render()
-
-        count += 1
-        if np.random.random() > epsilon:
-            action = np.random.randint(qlearn.QTable[discrete])
-        else:
-            action = np.random.randint(0, qlearn.env.action_space.n)
-        new_state, reward, terminated, truncated, info = qlearn.env.step(action)
-
-        newdiscrete = qlearn.state_to_discrete(new_state, qlearn.bins, qlearn.space)
-
-        maxQprime = np.max(qlearn.QTable[newdiscrete])
-        Q = qlearn.QTable[discrete + (action, )]
-
-        if done and count < 200:
-            reward = MINUS
-
-        qlearn.QTable[discrete + (action, )] = (1 - LEARNING_RATE) * Q + LEARNING_RATE * (reward + DISCOUNT * maxQprime) #Bellmann
-        discrete = newdiscrete
-        qlearn.env.render()
-    scores.append(count)
-
-qlearn.env.close()
