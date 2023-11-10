@@ -11,8 +11,8 @@ $ pip install gym==0.25.2
 $ pip install numpy
 ```
 
-So the only imports will be these two libraries. Now just run the code in your IDE.
-
+So the only imports to run the code will be these two libraries. Now just run the code in your IDE.
+In the imports section you will find the ```matplotlib``` library, this one is unecessary, it's useful if you want to track the evolution of the score depending on the episodes. I wrote some comments next to lines that are using the library, don't hesitate to remove these lines.
 ## How it works
 
 #### Q-Learning
@@ -33,7 +33,7 @@ So we want to use exploitable values, that's why we compute discretes values, it
 - pole angle
 - pole velocity
 
-Then we have the main function ```fit```. Let us break it down.
+Then we have the main function ```fit```. Let us break it down. Basically, we train our model a certain amount of time, so it can learns from the rewards. For each episode (iteration), we're balancing the pole while the condition ```done``` is false, this condition check for each action we're doing if the pole is more than 15 degrees from vertical or the cart moves more than 2.4 units from the center. Depending on the ouput of the action, the score get rewarded or not. Then, if the condition is still false, we update the $Q$, based on the output of our last action.
 
 
 
